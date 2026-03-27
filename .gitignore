@@ -1,0 +1,10 @@
+.DS_Store
+*.elf
+*.bin
+*.hex
+*.map
+build/
+Debug/
+Release/
+STM32CubeIDE/Debug/
+STM32CubeIDE/Release/

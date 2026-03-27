@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake --version)",
+      "Bash(ninja --version)",
+      "Bash(arm-none-eabi-gcc --version)",
+      "Read(//c/ST/**)",
+      "Read(//c/Program Files/**)",
+      "Bash(xargs grep:*)",
+      "Bash(powershell -Command \"Get-ChildItem ''d:/Work_202506/FOC/ST_FOC/ST_FOC/Inc'' | Sort-Object LastWriteTime -Descending | Select-Object Name, LastWriteTime | Format-Table -AutoSize\")",
+      "Bash(grep -rn \"A2212\\\\|Holybro\\\\|MOTOR_NAME\" d:/Work_202506/FOC/ST_FOC/ST_FOC/ --include=*.c --include=*.h)",
+      "Bash(grep -rn \"A2212\\\\|Holybro\\\\|920KV\\\\|MOTOR_NAME\\\\|MotorName\\\\|motor_name\" d:/Work_202506/FOC/ST_FOC/ST_FOC/ --include=*.c --include=*.h)",
+      "Bash(grep -E \"\\\\.\\(c|h\\)$\")",
+      "Bash(date /t)",
+      "Bash(time /t)",
+      "Bash(powershell -Command \"Get-Date -Format ''yyyy-MM-dd HH:mm''\")",
+      "Bash(find d:/Work_202506/FOC/ST_FOC/ST_FOC -name *.a -o -name *.lib)"
+    ],
+    "additionalDirectories": [
+      "d:\\Work_202506\\FOC\\ST_FOC\\ST_FOC"
+    ]
+  }
+}

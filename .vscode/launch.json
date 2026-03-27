@@ -1,0 +1,55 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug (ST-Link GDB Server)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "stlink",
+            "serverpath": "C:/ST/STM32CubeIDE_1.18.1/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.stlink-gdb-server.win32_2.2.400.202601091506/tools/bin/ST-LINK_gdbserver.exe",
+            "stm32cubeprogrammer": "C:/ST/STM32CubeIDE_1.18.1/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.cubeprogrammer.win32_2.2.400.202601091506/tools/bin",
+            "armToolchainPath": "C:/ST/STM32CubeIDE_1.18.1/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.14.3.rel1.win32_1.0.100.202602081740/tools/bin",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/Debug/ST_FOC.elf",
+            "device": "STM32G431CBUx",
+            "interface": "swd",
+            "preLaunchTask": "CMake: 建置 Debug",
+            "runToEntryPoint": "main",
+            "showDevDebugOutput": "none",
+            "liveWatch": {
+                "enabled": true,
+                "samplesPerSecond": 4
+            }
+        },
+        {
+            "name": "Debug (J-Link)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "jlink",
+            "armToolchainPath": "C:/ST/STM32CubeIDE_1.18.1/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.14.3.rel1.win32_1.0.100.202602081740/tools/bin",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/Debug/ST_FOC.elf",
+            "device": "STM32G431CB",
+            "interface": "swd",
+            "preLaunchTask": "CMake: 建置 Debug",
+            "runToEntryPoint": "main",
+            "showDevDebugOutput": "none"
+        },
+        {
+            "name": "Debug (OpenOCD + ST-Link)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "openocd",
+            "armToolchainPath": "C:/ST/STM32CubeIDE_1.18.1/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.14.3.rel1.win32_1.0.100.202602081740/tools/bin",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/Debug/ST_FOC.elf",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32g4x.cfg"
+            ],
+            "preLaunchTask": "CMake: 建置 Debug",
+            "runToEntryPoint": "main",
+            "showDevDebugOutput": "none"
+        }
+    ]
+}
