@@ -28,6 +28,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 project(${CMAKE_PROJECT_NAME})
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
+# Keep Cortex-M code generation stable even if Cube-generated toolchain files
+# are regenerated.
+add_compile_options(-mthumb)
+add_link_options(-mthumb)
+
 # Enable CMake support for ASM and C languages
 enable_language(C ASM)
 
@@ -36,6 +41,21 @@ add_executable(${CMAKE_PROJECT_NAME})
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
+
+# Custom modules that must survive CubeMX / MC Workbench regeneration.
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/user_app.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/user_platform.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/user_sensored.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/user_sensored_foc.c
+)
+
+# User-owned HAL extensions added outside generated source lists.
+target_sources(STM32_Drivers PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c_ex.c
+)
+target_compile_definitions(stm32cubemx INTERFACE HAL_I2C_MODULE_ENABLED)
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE

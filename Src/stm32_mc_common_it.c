@@ -35,7 +35,9 @@
 #include "mcp_config.h"
 
 /* USER CODE BEGIN Includes */
-
+#include "user_config.h"
+#include "user_app.h"
+#include "user_platform.h"
 /* USER CODE END Includes */
 
 /** @addtogroup MCSDK
@@ -72,6 +74,9 @@ void USART2_IRQHandler(void)
   /* USER CODE BEGIN USART2_IRQHandler 0 */
 
   /* USER CODE END USART2_IRQHandler 0 */
+#if USER_PLATFORM_OWNS_USART2 != 0U
+  return;
+#else
   uint32_t flags;
   uint32_t activeIdleFlag;
   uint32_t isEnabledIdleFlag;
@@ -139,6 +144,7 @@ void USART2_IRQHandler(void)
   /* USER CODE BEGIN USART2_IRQHandler 1 */
 
   /* USER CODE END USART2_IRQHandler 1 */
+#endif
 }
 
 /**
@@ -188,8 +194,12 @@ static uint8_t SystickDividerCounter = SYSTICK_DIVIDER;
   /* NO DMA interrupt */
   if (LL_DMA_IsActiveFlag_TC(DMA_RX_A, DMACH_RX_A))
   {
+#if USER_PLATFORM_OWNS_USART2 == 0U
     LL_DMA_ClearFlag_TC(DMA_RX_A, DMACH_RX_A);
     ASPEP_HWDataReceivedIT(&aspepOverUartA);
+#else
+    LL_DMA_ClearFlag_TC(DMA_RX_A, DMACH_RX_A);
+#endif
   }
   else
   {
@@ -213,10 +223,24 @@ static uint8_t SystickDividerCounter = SYSTICK_DIVIDER;
 void EXTI15_10_IRQHandler(void)
 {
   /* USER CODE BEGIN START_STOP_BTN */
+#if USER_CONTROL_MODE == USER_CONTROL_MODE_PWM_TARGET_AS5600
+  if (0U != LL_EXTI_ReadFlag_0_31(LL_EXTI_LINE_15))
+  {
+    LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_15);
+    UserPlatform_HandlePwmTargetEdgeInterrupt();
+  }
+#endif
+
   if (0U != LL_EXTI_ReadFlag_0_31(LL_EXTI_LINE_10))
   {
     LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_10);
+#if (USER_CONTROL_MODE == USER_CONTROL_MODE_POSITION_AS5600) || \
+    (USER_CONTROL_MODE == USER_CONTROL_MODE_UART_TARGET_AS5600) || \
+    (USER_CONTROL_MODE == USER_CONTROL_MODE_PWM_TARGET_AS5600)
+    UserApp_HandleUserButton();
+#else
     (void)UI_HandleStartStopButton_cb();
+#endif
   }
   else
   {

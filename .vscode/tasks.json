@@ -2,58 +2,32 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "CMake: 設定 Debug",
+            "label": "Build Debug",
             "type": "shell",
-            "command": "cmake",
+            "command": "powershell",
             "args": [
-                "--preset", "Debug"
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\tools\\build.ps1",
+                "-Preset",
+                "Debug",
+                "-BuildDir",
+                ".\\build\\Debug"
             ],
             "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "PATH": "C:\\ST\\STM32CubeIDE_1.18.1\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.cmake.win32_1.1.100.202601091506\\tools\\bin;C:\\ST\\STM32CubeIDE_1.18.1\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.ninja.win32_1.1.100.202601091506\\tools\\bin;C:\\ST\\STM32CubeIDE_1.18.1\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.14.3.rel1.win32_1.0.100.202602081740\\tools\\bin;${env:PATH}"
-                }
-            },
-            "group": "build",
-            "problemMatcher": []
-        },
-        {
-            "label": "CMake: Clean Debug",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "--build", "--preset", "Debug", "--target", "clean"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "PATH": "C:\\ST\\STM32CubeIDE_1.18.1\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.cmake.win32_1.1.100.202601091506\\tools\\bin;C:\\ST\\STM32CubeIDE_1.18.1\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.ninja.win32_1.1.100.202601091506\\tools\\bin;C:\\ST\\STM32CubeIDE_1.18.1\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.14.3.rel1.win32_1.0.100.202602081740\\tools\\bin;${env:PATH}"
-                }
-            },
-            "group": "build",
-            "problemMatcher": []
-        },
-        {
-            "label": "CMake: 建置 Debug",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "--build", "--preset", "Debug"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "PATH": "C:\\ST\\STM32CubeIDE_1.18.1\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.cmake.win32_1.1.100.202601091506\\tools\\bin;C:\\ST\\STM32CubeIDE_1.18.1\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.ninja.win32_1.1.100.202601091506\\tools\\bin;C:\\ST\\STM32CubeIDE_1.18.1\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.14.3.rel1.win32_1.0.100.202602081740\\tools\\bin;${env:PATH}"
-                }
+                "cwd": "${workspaceFolder}"
             },
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
-            "dependsOn": "CMake: 設定 Debug",
             "problemMatcher": {
                 "owner": "gcc",
-                "fileLocation": ["relative", "${workspaceFolder}"],
+                "fileLocation": [
+                    "relative",
+                    "${workspaceFolder}"
+                ],
                 "pattern": {
                     "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
                     "file": 1,
@@ -63,6 +37,46 @@
                     "message": 5
                 }
             }
+        },
+        {
+            "label": "Clean Debug",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\tools\\build.ps1",
+                "-Preset",
+                "Debug",
+                "-BuildDir",
+                ".\\build\\Debug",
+                "-BuildOnly",
+                "-Clean"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Rebuild Devlog Index",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\tools\\update-devlog.ps1",
+                "-LogPath",
+                "${workspaceFolder}\\devlog.md",
+                "-RebuildIndexOnly"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
         }
     ]
 }

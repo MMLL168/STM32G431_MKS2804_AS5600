@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "user_platform.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -62,7 +62,6 @@ DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
-volatile uint8_t dbg_pb12 = 0;   /* TEST: PB12 數位電位 0=LOW 1=HIGH */
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -138,7 +137,7 @@ int main(void)
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
-
+  UserPlatform_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */

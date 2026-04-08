@@ -37,6 +37,7 @@
 
 /* USER CODE BEGIN Includes */
 #include "mc_config.h"   /* STO_PLL_M1, STO_PLL_Handle_t */
+#include "user_config.h"
 /* USER CODE END Includes */
 
 /* USER CODE BEGIN Private define */
@@ -103,7 +104,9 @@ __weak void MCboot( MCI_Handle_t* pMCIList[NBR_OF_MOTORS] )
     pMCIList[M1] = &Mci[M1];
     FOC_Init();
 
+#if USER_PLATFORM_OWNS_USART2 == 0U
     ASPEP_start(&aspepOverUartA);
+#endif
     /* USER CODE BEGIN MCboot 1 */
 
     /* USER CODE END MCboot 1 */
@@ -190,6 +193,7 @@ __weak void MC_RunMotorControlTasks(void)
       /* Applicative hook at end of Medium Frequency for Motor 1 */
       MC_APP_PostMediumFrequencyHook_M1();
 
+#if USER_PLATFORM_OWNS_USART2 == 0U
       MCP_Over_UartA.rxBuffer = MCP_Over_UartA.pTransportLayer->fRXPacketProcess(MCP_Over_UartA.pTransportLayer,
                                                                                 &MCP_Over_UartA.rxLength);
       if ( 0U == MCP_Over_UartA.rxBuffer)
@@ -213,6 +217,7 @@ __weak void MC_RunMotorControlTasks(void)
           /* No buffer available to build the answer ... should not occur */
         }
       }
+#endif
 
       /* USER CODE BEGIN MC_Scheduler 1 */
 
