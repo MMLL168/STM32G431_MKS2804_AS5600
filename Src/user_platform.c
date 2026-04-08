@@ -94,6 +94,25 @@ static void UserPlatform_InitPwmTargetInput(void) {
 #endif
 }
 
+static void UserPlatform_InitUserButtonInput(void) {
+#if (USER_CONTROL_MODE == USER_CONTROL_MODE_POSITION_AS5600) || \
+    (USER_CONTROL_MODE == USER_CONTROL_MODE_UART_TARGET_AS5600) || \
+    (USER_CONTROL_MODE == USER_CONTROL_MODE_PWM_TARGET_AS5600)
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+
+  /*
+   * Re-own PC10 in user code so press and release are both visible.
+   * Generated code configures only falling-edge start/stop behavior.
+   */
+  GPIO_InitStruct.Pin = Start_Stop_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(Start_Stop_GPIO_Port, &GPIO_InitStruct);
+#endif
+}
+
 static void UserPlatform_ClearRemoteTargetLine(void) {
   s_remoteTargetLineLength = 0U;
   s_remoteTargetLine[0] = '\0';
@@ -268,6 +287,7 @@ void UserPlatform_Init(void) {
     Error_Handler();
   }
 
+  UserPlatform_InitUserButtonInput();
   UserPlatform_InitPwmTargetInput();
   UserPlatform_PrepareUartTargetPort();
   UserPlatform_ApplyRuntimeMotorTuning();

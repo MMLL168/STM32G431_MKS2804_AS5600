@@ -34,6 +34,7 @@ static uint8_t s_posHoldActive = 1U;
 static int16_t s_posTargetOffsetDeg10 = 0;
 static uint8_t s_posTargetOffsetSeeded = 0U;
 static uint8_t s_posZeroCalRequest = 0U;
+static uint8_t s_userButtonPressed = 0U;
 static uint32_t s_userButtonLastTickMs = 0U;
 #endif
 
@@ -83,6 +84,7 @@ uint16_t dbg_pwmTargetPulseWidthUs = 0U;
 uint32_t dbg_pwmTargetFrameCount = 0U;
 uint32_t dbg_pwmTargetErrorCount = 0U;
 uint32_t dbg_zeroCalCount = 0U;
+uint8_t dbg_zeroCalButtonPressed = 0U;
 
 #if (USER_CONTROL_MODE == USER_CONTROL_MODE_THROTTLE) || \
     (USER_CONTROL_MODE == USER_CONTROL_MODE_POSITION_AS5600) || \
@@ -374,6 +376,7 @@ static int16_t CurrentMilliAmpToDigit(int32_t currentMilliAmp) {
 }
 
 static void StartOrUpdateCurrentCommand(int32_t targetCurrentMilliAmp);
+static void StopMotorDriveIfRunning(void);
 static void StopMotorControlIfRunning(void);
 
 static void RunSensoredPositionController(uint16_t rawTargetAngleDeg10) {
@@ -428,6 +431,19 @@ static void RunSensoredPositionController(uint16_t rawTargetAngleDeg10) {
     dbg_angleErrDeg10 =
         (int16_t)UserClampI32(angleErrDeg10, INT16_MIN, INT16_MAX);
     dbg_sensoredSpeedRpm = speedRpm;
+
+    if (s_userButtonPressed != 0U) {
+      s_posCurrentCmdMilliAmp = 0;
+      s_posTargetRpmCmd = 0;
+      s_posFilteredSpeedRpm = 0;
+      s_posHoldActive = 1U;
+      dbg_posHoldActive = 1U;
+      dbg_posCurrentCmdMa = 0;
+      dbg_posTargetRpm = 0;
+      dbg_posSpeedErrRpm = 0;
+      StopMotorDriveIfRunning();
+      return;
+    }
 
     if (s_posHoldActive != 0U) {
       if (absErrDeg10 >= USER_POS_HOLD_EXIT_DEG10) {
@@ -650,12 +666,25 @@ void UserApp_HandleUserButton(void) {
      (USER_CONTROL_MODE == USER_CONTROL_MODE_PWM_TARGET_AS5600)) && \
     (USER_FOC_BACKEND == USER_FOC_BACKEND_AS5600_SENSORED)
   uint32_t nowTickMs = HAL_GetTick();
+  GPIO_PinState pinState;
+  uint8_t isPressed;
 
   if ((nowTickMs - s_userButtonLastTickMs) < USER_BUTTON_DEBOUNCE_MS) {
     return;
   }
   s_userButtonLastTickMs = nowTickMs;
-  s_posZeroCalRequest = 1U;
+  pinState = HAL_GPIO_ReadPin(Start_Stop_GPIO_Port, Start_Stop_Pin);
+  isPressed = (pinState == GPIO_PIN_RESET) ? 1U : 0U;
+
+  if (isPressed != 0U) {
+    s_userButtonPressed = 1U;
+  } else {
+    if (s_userButtonPressed != 0U) {
+      s_posZeroCalRequest = 1U;
+    }
+    s_userButtonPressed = 0U;
+  }
+  dbg_zeroCalButtonPressed = s_userButtonPressed;
 #else
   /* No user-owned button action in the current control mode. */
 #endif
