@@ -1,7 +1,10 @@
 #include "user_platform.h"
+#include <stdio.h>
+
 #include "user_config.h"
 #include "mc_config.h"
 #include "parameters_conversion.h"
+#include "stm32g4xx_ll_exti.h"
 #include "stm32g4xx_ll_usart.h"
 
 #define USER_AS5600_RAW_ANGLE_REG 0x0EU
@@ -13,6 +16,7 @@
 #define USER_UART_TARGET_TAU_X10000 62832UL
 
 static I2C_HandleTypeDef s_hi2c1;
+static TIM_HandleTypeDef s_htim2;
 static uint8_t s_as5600I2cReady = 0U;
 static uint8_t s_pwmTargetHasValue = 0U;
 static uint8_t s_pwmTargetAwaitingFalling = 0U;
@@ -21,8 +25,7 @@ static uint16_t s_pwmTargetPulseWidthUs = 0U;
 static uint32_t s_pwmTargetFrameCount = 0U;
 static uint32_t s_pwmTargetErrorCount = 0U;
 static uint32_t s_pwmTargetLastTickMs = 0U;
-static uint32_t s_pwmTargetRiseCycles = 0U;
-static uint32_t s_cyclesPerMicrosecond = 0U;
+static uint32_t s_pwmTargetRiseCaptureUs = 0U;
 static uint16_t s_remoteTargetAngleDeg10 = 0U;
 static uint32_t s_remoteTargetFrameCount = 0U;
 static uint32_t s_remoteTargetErrorCount = 0U;
@@ -30,6 +33,11 @@ static uint32_t s_remoteTargetLastFrameTickMs = 0U;
 static uint8_t s_remoteTargetHasValue = 0U;
 static uint8_t s_remoteTargetLineLength = 0U;
 static char s_remoteTargetLine[USER_UART_TARGET_LINE_MAX_LEN];
+static uint32_t s_angleTelemetryLastTickMs = 0U;
+static uint32_t s_angleTelemetryTxCount = 0U;
+static uint32_t s_angleTelemetryErrorCount = 0U;
+
+extern UART_HandleTypeDef huart2;
 
 static int16_t UserCurrentMilliAmpToDigit(int32_t currentMilliAmp) {
   return (int16_t)((currentMilliAmp * (int32_t)CURRENT_CONV_FACTOR) / 1000);
@@ -39,18 +47,14 @@ static int16_t UserRpmToSpeedUnit(int32_t rpm) {
   return (int16_t)((rpm * SPEED_UNIT) / U_RPM);
 }
 
-static void UserPlatform_EnableCycleCounter(void) {
-  if (s_cyclesPerMicrosecond != 0U) {
-    return;
+static uint32_t UserPlatform_GetApb1TimerClockHz(void) {
+  uint32_t pclk1Hz = HAL_RCC_GetPCLK1Freq();
+
+  if ((RCC->CFGR & RCC_CFGR_PPRE1) == RCC_CFGR_PPRE1_DIV1) {
+    return pclk1Hz;
   }
 
-  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-  DWT->CYCCNT = 0U;
-  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
-  s_cyclesPerMicrosecond = HAL_RCC_GetHCLKFreq() / 1000000U;
-  if (s_cyclesPerMicrosecond == 0U) {
-    s_cyclesPerMicrosecond = 1U;
-  }
+  return pclk1Hz * 2U;
 }
 
 static uint16_t UserPlatform_MapPulseWidthUsToAngleDeg10(uint16_t pulseWidthUs) {
@@ -72,17 +76,53 @@ static uint16_t UserPlatform_MapPulseWidthUsToAngleDeg10(uint16_t pulseWidthUs) 
 static void UserPlatform_InitPwmTargetInput(void) {
 #if USER_CONTROL_MODE == USER_CONTROL_MODE_PWM_TARGET_AS5600
   GPIO_InitTypeDef GPIO_InitStruct = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
+  uint32_t timerClockHz = UserPlatform_GetApb1TimerClockHz();
+  uint32_t prescaler = 0U;
 
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_SYSCFG_CLK_ENABLE();
+  __HAL_RCC_TIM2_CLK_ENABLE();
+
+  LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_15);
+  LL_EXTI_DisableRisingTrig_0_31(LL_EXTI_LINE_15);
+  LL_EXTI_DisableFallingTrig_0_31(LL_EXTI_LINE_15);
+  LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_15);
 
   GPIO_InitStruct.Pin = USER_PWM_TARGET_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  GPIO_InitStruct.Alternate = GPIO_AF1_TIM2;
   HAL_GPIO_Init(USER_PWM_TARGET_GPIO_Port, &GPIO_InitStruct);
 
-  UserPlatform_EnableCycleCounter();
+  if (timerClockHz >= 1000000U) {
+    prescaler = (timerClockHz / 1000000U) - 1U;
+  }
+
+  s_htim2.Instance = TIM2;
+  s_htim2.Init.Prescaler = prescaler;
+  s_htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  s_htim2.Init.Period = 0xFFFFFFFFU;
+  s_htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  s_htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_IC_Init(&s_htim2) != HAL_OK) {
+    Error_Handler();
+  }
+
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_BOTHEDGE;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0U;
+  if (HAL_TIM_IC_ConfigChannel(&s_htim2, &sConfigIC, TIM_CHANNEL_1) != HAL_OK) {
+    Error_Handler();
+  }
+
+  HAL_NVIC_SetPriority(TIM2_IRQn, 3, 2);
+  HAL_NVIC_EnableIRQ(TIM2_IRQn);
+  if (HAL_TIM_IC_Start_IT(&s_htim2, TIM_CHANNEL_1) != HAL_OK) {
+    Error_Handler();
+  }
+
   s_pwmTargetHasValue = 0U;
   s_pwmTargetAwaitingFalling = 0U;
   s_pwmTargetAngleDeg10 = 0U;
@@ -90,7 +130,7 @@ static void UserPlatform_InitPwmTargetInput(void) {
   s_pwmTargetFrameCount = 0U;
   s_pwmTargetErrorCount = 0U;
   s_pwmTargetLastTickMs = 0U;
-  s_pwmTargetRiseCycles = 0U;
+  s_pwmTargetRiseCaptureUs = 0U;
 #endif
 }
 
@@ -319,43 +359,57 @@ uint8_t UserPlatform_ReadAs5600RawAngle(uint16_t *rawAngle) {
 }
 
 void UserPlatform_HandlePwmTargetEdgeInterrupt(void) {
+  /* PWM capture now uses TIM2 input capture hardware, not EXTI timing. */
+  (void)0;
+}
+
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 #if USER_CONTROL_MODE == USER_CONTROL_MODE_PWM_TARGET_AS5600
-  GPIO_PinState pinState = HAL_GPIO_ReadPin(USER_PWM_TARGET_GPIO_Port, USER_PWM_TARGET_Pin);
-  uint32_t nowCycles;
-
-  UserPlatform_EnableCycleCounter();
-  nowCycles = DWT->CYCCNT;
-
-  if (pinState == GPIO_PIN_SET) {
-    s_pwmTargetRiseCycles = nowCycles;
-    s_pwmTargetAwaitingFalling = 1U;
+  if ((htim == NULL) || (htim->Instance != TIM2) ||
+      (htim->Channel != HAL_TIM_ACTIVE_CHANNEL_1)) {
     return;
   }
 
-  if (s_pwmTargetAwaitingFalling == 0U) {
-    s_pwmTargetErrorCount++;
-    return;
-  }
+  {
+    GPIO_PinState pinState = HAL_GPIO_ReadPin(USER_PWM_TARGET_GPIO_Port, USER_PWM_TARGET_Pin);
+    uint32_t captureUs = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
 
-  s_pwmTargetAwaitingFalling = 0U;
-  if (nowCycles > s_pwmTargetRiseCycles) {
-    uint32_t pulseCycles = nowCycles - s_pwmTargetRiseCycles;
-    uint32_t pulseWidthUs =
-        (pulseCycles + (s_cyclesPerMicrosecond / 2U)) / s_cyclesPerMicrosecond;
+    if (pinState == GPIO_PIN_SET) {
+      s_pwmTargetRiseCaptureUs = captureUs;
+      s_pwmTargetAwaitingFalling = 1U;
+      return;
+    }
 
-    if ((pulseWidthUs < 800U) || (pulseWidthUs > 2200U)) {
+    if (s_pwmTargetAwaitingFalling == 0U) {
       s_pwmTargetErrorCount++;
       return;
     }
 
-    s_pwmTargetPulseWidthUs = (uint16_t)pulseWidthUs;
-    s_pwmTargetAngleDeg10 = UserPlatform_MapPulseWidthUsToAngleDeg10(s_pwmTargetPulseWidthUs);
-    s_pwmTargetLastTickMs = HAL_GetTick();
-    s_pwmTargetHasValue = 1U;
-    s_pwmTargetFrameCount++;
-  } else {
-    s_pwmTargetErrorCount++;
+    s_pwmTargetAwaitingFalling = 0U;
+
+    {
+      uint32_t pulseWidthUs = captureUs - s_pwmTargetRiseCaptureUs;
+
+      if ((pulseWidthUs < 800U) || (pulseWidthUs > 2200U)) {
+        s_pwmTargetErrorCount++;
+        return;
+      }
+
+      s_pwmTargetPulseWidthUs = (uint16_t)pulseWidthUs;
+      s_pwmTargetAngleDeg10 = UserPlatform_MapPulseWidthUsToAngleDeg10(s_pwmTargetPulseWidthUs);
+      s_pwmTargetLastTickMs = HAL_GetTick();
+      s_pwmTargetHasValue = 1U;
+      s_pwmTargetFrameCount++;
+    }
   }
+#else
+  (void)htim;
+#endif
+}
+
+void TIM2_IRQHandler(void) {
+#if USER_CONTROL_MODE == USER_CONTROL_MODE_PWM_TARGET_AS5600
+  HAL_TIM_IRQHandler(&s_htim2);
 #endif
 }
 
@@ -447,6 +501,51 @@ uint8_t UserPlatform_GetRemoteTargetAngleDeg10(uint16_t *angleDeg10) {
 uint32_t UserPlatform_GetRemoteTargetFrameCount(void) { return s_remoteTargetFrameCount; }
 
 uint32_t UserPlatform_GetRemoteTargetErrorCount(void) { return s_remoteTargetErrorCount; }
+
+void UserPlatform_SendAngleTelemetry(uint16_t knobAngleDeg10,
+                                     uint16_t followerAngleDeg10,
+                                     int16_t angleErrDeg10,
+                                     uint16_t pulseWidthUs) {
+#if USER_PLATFORM_OWNS_USART2 != 0U
+  uint32_t nowTickMs = HAL_GetTick();
+  char line[48];
+  int length;
+
+  if ((nowTickMs - s_angleTelemetryLastTickMs) < USER_ANGLE_TELEMETRY_INTERVAL_MS) {
+    return;
+  }
+
+  if (huart2.gState != HAL_UART_STATE_READY) {
+    s_angleTelemetryErrorCount++;
+    return;
+  }
+
+  length = snprintf(line, sizeof(line), "ANG,%u,%u,%d,%u\r\n", knobAngleDeg10,
+                    followerAngleDeg10, (int)angleErrDeg10, pulseWidthUs);
+  if ((length <= 0) || ((size_t)length >= sizeof(line))) {
+    s_angleTelemetryErrorCount++;
+    return;
+  }
+
+  if (HAL_UART_Transmit(&huart2, (uint8_t *)line, (uint16_t)length, 2U) == HAL_OK) {
+    s_angleTelemetryLastTickMs = nowTickMs;
+    s_angleTelemetryTxCount++;
+  } else {
+    s_angleTelemetryErrorCount++;
+  }
+#else
+  (void)knobAngleDeg10;
+  (void)followerAngleDeg10;
+  (void)angleErrDeg10;
+  (void)pulseWidthUs;
+#endif
+}
+
+uint32_t UserPlatform_GetAngleTelemetryTxCount(void) { return s_angleTelemetryTxCount; }
+
+uint32_t UserPlatform_GetAngleTelemetryErrorCount(void) {
+  return s_angleTelemetryErrorCount;
+}
 
 void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c) {
   GPIO_InitTypeDef GPIO_InitStruct = {0};

@@ -37,6 +37,12 @@ uint8_t UserPlatform_IsRemoteTargetOnline(void);
 uint8_t UserPlatform_GetRemoteTargetAngleDeg10(uint16_t *angleDeg10);
 uint32_t UserPlatform_GetRemoteTargetFrameCount(void);
 uint32_t UserPlatform_GetRemoteTargetErrorCount(void);
+void UserPlatform_SendAngleTelemetry(uint16_t knobAngleDeg10,
+                                     uint16_t followerAngleDeg10,
+                                     int16_t angleErrDeg10,
+                                     uint16_t pulseWidthUs);
+uint32_t UserPlatform_GetAngleTelemetryTxCount(void);
+uint32_t UserPlatform_GetAngleTelemetryErrorCount(void);
 
 #ifdef __cplusplus
 }

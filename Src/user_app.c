@@ -85,6 +85,8 @@ uint32_t dbg_pwmTargetFrameCount = 0U;
 uint32_t dbg_pwmTargetErrorCount = 0U;
 uint32_t dbg_zeroCalCount = 0U;
 uint8_t dbg_zeroCalButtonPressed = 0U;
+uint32_t dbg_angleTelemetryTxCount = 0U;
+uint32_t dbg_angleTelemetryErrorCount = 0U;
 
 #if (USER_CONTROL_MODE == USER_CONTROL_MODE_THROTTLE) || \
     (USER_CONTROL_MODE == USER_CONTROL_MODE_POSITION_AS5600) || \
@@ -967,4 +969,11 @@ void UserApp_PostMediumFrequencyHook_M1(uint16_t rawValue) {
   dbg_currentFaults = MC_GetCurrentFaultsMotor1();
   dbg_occurredFaults = MC_GetOccurredFaultsMotor1();
   dbg_commandState = (uint16_t)MC_GetCommandStateMotor1();
+
+#if USER_CONTROL_MODE == USER_CONTROL_MODE_PWM_TARGET_AS5600
+  UserPlatform_SendAngleTelemetry(dbg_pwmTargetAngleDeg10, dbg_actualAngleDeg10,
+                                  dbg_angleErrDeg10, dbg_pwmTargetPulseWidthUs);
+  dbg_angleTelemetryTxCount = UserPlatform_GetAngleTelemetryTxCount();
+  dbg_angleTelemetryErrorCount = UserPlatform_GetAngleTelemetryErrorCount();
+#endif
 }

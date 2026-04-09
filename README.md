@@ -112,7 +112,7 @@ PWM pulse width
 Remote AS5600 angle
   -> ESP32S
   -> PWM pulse width
-  -> PA15 EXTI capture
+  -> PA15 / TIM2_CH1 input capture
   -> pulse width (us)
   -> target angle (deg10)
   -> position controller
@@ -195,9 +195,9 @@ user_config.h
 ### PWM 目標角模式
 
 ```text
-PA15 edge interrupt
-  -> UserPlatform_HandlePwmTargetEdgeInterrupt()
-  -> compute pulse width
+PA15 TIM2 input capture
+  -> TIM2 CH1 both-edge capture
+  -> hardware timestamp latch
   -> map 1000~2000us to 0~3590 deg10
 
 MC medium-frequency hook
@@ -335,8 +335,10 @@ Src/user_sensored_foc.c
   sensored FOC override/skeleton
 
 Src/stm32_mc_common_it.c
-  PA15 EXTI
   PC10 button EXTI
+
+Src/user_platform.c
+  PA15 TIM2 input capture
 ```
 
 ## 建議 Live Watch
@@ -381,6 +383,57 @@ Src/stm32_mc_common_it.c
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\build.ps1 -Preset Debug -BuildDir .\build\Debug
 ```
+
+## Tool App
+
+目前 active 的 `PWM_TARGET_AS5600` 模式會透過 `USART2 / ST-LINK VCP` 送出角度 telemetry，供本機工具 app 顯示:
+- 旋鈕角度
+- 跟隨馬達角度
+- 角度誤差
+- PWM 脈寬
+
+### Telemetry 格式
+
+```text
+ANG,<knob_deg10>,<follower_deg10>,<err_deg10>,<pulse_us>\r\n
+```
+
+範例:
+
+```text
+ANG,772,768,4,1215
+```
+
+表示:
+- 旋鈕角度 `77.2 deg`
+- 跟隨角度 `76.8 deg`
+- 誤差 `0.4 deg`
+- PWM 脈寬 `1215 us`
+
+### 執行方式
+
+先安裝 `pyserial`:
+
+```powershell
+pip install pyserial
+```
+
+再執行工具 app:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\run-angle-monitor.ps1
+```
+
+或直接執行:
+
+```powershell
+python .\tools\angle_monitor_app.py
+```
+
+### 注意
+
+- 這個工具 app 依賴 `USART2 / ST-LINK VCP`。
+- 在 `PWM_TARGET_AS5600` 模式下，`USART2` 由 user-owned telemetry 使用，不走 `ASPEP/Motor Pilot`。
 
 ## 注意事項
 
